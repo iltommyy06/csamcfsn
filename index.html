@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>per te</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400;1,600&family=Lato:wght@100;300&display=swap');
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #080606;
+    --rose: #e03030;
+    --deep-red: #7a0000;
+    --text: #f7f2ed;
+    --muted: #888;
+    --dim: #444;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+
+  body {
+    width: 100%;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+
+  /* ── Background canvas ── */
+  #bgCanvas {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ── Vignette ── */
+  #vignette {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 50% 45%,
+      transparent 20%,
+      rgba(0,0,0,0.45) 60%,
+      rgba(0,0,0,0.92) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* ── Stage ── */
+  #stage {
+    position: fixed; inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    padding: 1.5rem 2rem;
+    padding-top: calc(1.5rem + var(--safe-top));
+    padding-bottom: calc(5rem + var(--safe-bottom));
+  }
+
+  /* ── Cards ── */
+  .card {
+    position: absolute;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 1s cubic-bezier(0.22,1,0.36,1), transform 1s cubic-bezier(0.22,1,0.36,1);
+    width: 100%;
+    padding: 0 2rem;
+  }
+  .card.visible { opacity: 1; transform: translateY(0); }
+  .card.exit    { opacity: 0; transform: translateY(-22px);
+                  transition: opacity 0.55s ease, transform 0.55s ease; }
+
+  /* Number cards */
+  .card.number::before {
+    content: '';
+    display: block;
+    width: 24px; height: 1px;
+    background: linear-gradient(to right, transparent, var(--deep-red), transparent);
+    margin: 0 auto 1.4rem;
+    opacity: 0.9;
+  }
+  .card.number .label {
+    font-family: 'Lato', sans-serif;
+    font-weight: 100;
+    font-size: 0.65rem;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  .card.number .value {
+    font-size: clamp(4rem, 20vw, 6.5rem);
+    font-weight: 300;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: -0.03em;
+  }
+  .card.number .unit {
+    font-style: italic;
+    font-size: clamp(1.1rem, 5vw, 1.6rem);
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    letter-spacing: 0.04em;
+  }
+
+  /* Text cards */
+  .card.text .line {
+    font-size: clamp(1.45rem, 6.5vw, 2rem);
+    font-weight: 300;
+    font-style: italic;
+    line-height: 1.6;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+
+  /* Final card */
+  .card.final {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  #finalScene {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  #finalCanvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+  }
+
+  #finalText {
+    position: relative;
+    z-index: 3;
+    font-size: clamp(2rem, 8vw, 3rem);
+    font-weight: 400;
+    font-style: italic;
+    color: var(--rose);
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    animation: textPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes textPulse {
+    0%,100% { text-shadow: 0 0 24px rgba(220,48,48,0.55), 0 0 60px rgba(220,48,48,0.15); }
+    50%     { text-shadow: 0 0 40px rgba(220,48,48,0.85), 0 0 90px rgba(220,48,48,0.3); }
+  }
+
+  /* ── Progress dots ── */
+  #dots {
+    position: fixed;
+    bottom: calc(1.8rem + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 7px;
+    z-index: 10;
+  }
+  .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: background 0.4s, transform 0.4s;
+  }
+  .dot.active { background: var(--rose); transform: scale(1.4); }
+
+  /* ── Tap hint ── */
+  #hint {
+    position: fixed;
+    bottom: calc(3.8rem + var(--safe-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Lato', sans-serif;
+    font-weight: 100;
+    font-size: 0.55rem;
+    letter-spacing: 0.46em;
+    text-transform: uppercase;
+    color: var(--dim);
+    pointer-events: none;
+    z-index: 10;
+    white-space: nowrap;
+    animation: hintPulse 3.5s ease-in-out 2s infinite;
+  }
+  @keyframes hintPulse {
+    0%,100% { opacity: 0; }
+    50%     { opacity: 0.65; }
+  }
+
+  /* ── Touch ripple ── */
+  .ripple {
+    position: fixed;
+    border-radius: 50%;
+    background: rgba(180, 30, 30, 0.18);
+    pointer-events: none;
+    z-index: 5;
+    transform: scale(0);
+    animation: rippleAnim 0.6s ease-out forwards;
+  }
+  @keyframes rippleAnim {
+    to { transform: scale(4); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div id="vignette"></div>
+<div id="stage"></div>
+<div id="dots"></div>
+<div id="hint">tocca per continuare</div>
+
+<script>
+/* ─── BACKGROUND ─── */
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const sparks = Array.from({length: 55}, () => mkSpark({}));
+  function mkSpark(s) {
+    s.x = Math.random() * window.innerWidth;
+    s.y = Math.random() * window.innerHeight;
+    s.r = Math.random() * 1.3 + 0.3;
+    s.vx = (Math.random() - 0.5) * 0.22;
+    s.vy = -(Math.random() * 0.45 + 0.08);
+    s.life = Math.random() * 300;
+    s.maxLife = Math.random() * 280 + 180;
+    s.hue = Math.random() < 0.65 ? 0 : 18;
+    return s;
+  }
+
+  const rays = Array.from({length: 9}, (_, i) => ({
+    angle: (i / 9) * Math.PI * 2,
+    speed: (Math.random() - 0.5) * 0.00025,
+    len: Math.random() * 0.38 + 0.18,
+    alpha: Math.random() * 0.035 + 0.008,
+  }));
+
+  // Slow floating large shapes
+  const blobs = Array.from({length: 5}, (_, i) => ({
+    x: Math.random(), y: Math.random(),
+    r: Math.random() * 0.22 + 0.1,
+    vx: (Math.random()-0.5)*0.00015,
+    vy: (Math.random()-0.5)*0.00015,
+    alpha: Math.random()*0.06+0.02,
+  }));
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+
+    // Bottom glow
+    let g = ctx.createRadialGradient(W/2,H*0.8,0,W/2,H*0.8,H*0.65);
+    g.addColorStop(0,'rgba(110,0,0,0.22)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // Top glow
+    g = ctx.createRadialGradient(W/2,0,0,W/2,0,H*0.55);
+    g.addColorStop(0,'rgba(70,0,0,0.14)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // Corner embers
+    [[0,0],[W,0],[0,H],[W,H]].forEach(([cx,cy]) => {
+      g = ctx.createRadialGradient(cx,cy,0,cx,cy,W*0.35);
+      g.addColorStop(0,'rgba(80,0,0,0.1)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    });
+
+    // Slow blobs
+    blobs.forEach(b => {
+      b.x += b.vx; b.y += b.vy;
+      if(b.x<0||b.x>1) b.vx*=-1;
+      if(b.y<0||b.y>1) b.vy*=-1;
+      g = ctx.createRadialGradient(b.x*W,b.y*H,0,b.x*W,b.y*H,b.r*W);
+      g.addColorStop(0,`rgba(150,0,0,${b.alpha})`); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    });
+
+    // Rays
+    rays.forEach(r => {
+      r.angle += r.speed;
+      ctx.save(); ctx.translate(W/2,H/2); ctx.rotate(r.angle);
+      const gr = ctx.createLinearGradient(0,0,W*r.len,0);
+      gr.addColorStop(0,`rgba(180,20,20,${r.alpha})`);
+      gr.addColorStop(1,'rgba(180,20,20,0)');
+      ctx.strokeStyle=gr; ctx.lineWidth=W*0.2;
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W*r.len,0); ctx.stroke();
+      ctx.restore();
+    });
+
+    // Sparks
+    sparks.forEach(s => {
+      s.x+=s.vx; s.y+=s.vy; s.life++;
+      if(s.life>s.maxLife||s.y<-5) mkSpark(s);
+      const p=s.life/s.maxLife;
+      const a=p<0.15?p/0.15*0.75:(1-p)*0.75;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`hsla(${s.hue},88%,62%,${a})`; ctx.fill();
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+
+/* ─── FINAL ANIMATION ─── */
+let finalAnimId = null;
+
+function startFinalAnimation() {
+  const canvas = document.getElementById('finalCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Use actual viewport dimensions
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  canvas.width  = W;
+  canvas.height = H;
+
+  // Heart center = screen center
+  const cx = W / 2;
+  const cy = H / 2;
+
+  // Scale: heart half-width ~30% of smallest dimension, so it frames the text nicely
+  const hR = Math.min(W, H) * 0.30;
+
+  // Parametric heart → gives point on unit heart scaled to hR
+  // Heart formula: x=16sin³t, y=13cost-5cos2t-2cos3t-cos4t  (max extent ~16 wide, ~13 tall)
+  // We normalise so half-width = hR
+  const hScaleX = hR / 16;
+  const hScaleY = hR / 13;
+
+  function rawHeart(t) {
+    return {
+      x: cx + hScaleX * 16 * Math.pow(Math.sin(t), 3),
+      y: cy - hScaleY * (13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t))
+    };
+  }
+
+  // Arc-length uniform sampling
+  const STEPS = 3000;
+  let totalLen = 0;
+  const arcTable = [];
+  let prev = rawHeart(0);
+  arcTable.push({ t: 0, len: 0, x: prev.x, y: prev.y });
+  for (let i = 1; i <= STEPS; i++) {
+    const t = (i / STEPS) * Math.PI * 2;
+    const p = rawHeart(t);
+    const dx = p.x - prev.x, dy = p.y - prev.y;
+    totalLen += Math.sqrt(dx*dx + dy*dy);
+    arcTable.push({ t, len: totalLen, x: p.x, y: p.y });
+    prev = p;
+  }
+
+  function pointAtFraction(frac) {
+    const target = frac * totalLen;
+    let lo = 0, hi = arcTable.length - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      arcTable[mid].len < target ? lo = mid : hi = mid;
+    }
+    const a = arcTable[lo], b = arcTable[hi];
+    const u = b.len === a.len ? 0 : (target - a.len) / (b.len - a.len);
+    return { x: a.x + u*(b.x-a.x), y: a.y + u*(b.y-a.y) };
+  }
+
+  const N = 52;
+  const targets = Array.from({ length: N }, (_, i) => pointAtFraction(i / N));
+
+  // Stick figures — bottom corners, small
+  const sc = Math.min(W, H) * 0.065;
+  const manX   = W * 0.10,  manY   = H * 0.88;
+  const womanX = W * 0.90,  womanY = H * 0.88;
+
+  let frameN = 0, nextTarget = 0, spawnTimer = 0;
+  const SPAWN_EVERY = 7;
+  const flying = [];
+  const landed = new Array(N).fill(null);
+
+  function miniHeart(x, y, s, alpha, col) {
+    if (alpha <= 0 || s <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = col || '#e63030';
+    ctx.beginPath();
+    // Simple symmetric heart centred at (x,y)
+    ctx.moveTo(x, y + s * 0.35);
+    ctx.bezierCurveTo(x + s, y + s*0.1,   x + s, y - s*0.8,  x, y - s*0.45);
+    ctx.bezierCurveTo(x - s, y - s*0.8,   x - s, y + s*0.1,  x, y + s*0.35);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function figure(x, y, s, female, shooting) {
+    ctx.save();
+    ctx.strokeStyle = '#f0ebe3';
+    ctx.lineWidth = Math.max(1.5, s * 0.14);
+    ctx.lineCap = 'round';
+    // head
+    ctx.beginPath(); ctx.arc(x, y - s*1.85, s*0.33, 0, Math.PI*2); ctx.stroke();
+    // body
+    ctx.beginPath(); ctx.moveTo(x, y-s*1.52); ctx.lineTo(x, y-s*0.50); ctx.stroke();
+    if (female) {
+      // skirt
+      ctx.save(); ctx.strokeStyle='#e63030'; ctx.lineWidth=Math.max(1,s*0.12);
+      ctx.beginPath(); ctx.moveTo(x,y-s*0.50); ctx.lineTo(x-s*0.50,y+s*0.50); ctx.lineTo(x+s*0.50,y+s*0.50); ctx.closePath(); ctx.stroke();
+      ctx.restore();
+      ctx.beginPath(); ctx.moveTo(x-s*0.13,y+s*0.50); ctx.lineTo(x-s*0.13,y+s*1.0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+s*0.13,y+s*0.50); ctx.lineTo(x+s*0.13,y+s*1.0); ctx.stroke();
+      // long hair — two flowing strands on sides
+      ctx.save();
+      ctx.strokeStyle = '#f0ebe3';
+      ctx.lineWidth = Math.max(2, s * 0.13);
+      ctx.lineCap = 'round';
+      // left strand
+      ctx.beginPath();
+      ctx.moveTo(x - s*0.28, y - s*2.10);
+      ctx.bezierCurveTo(x - s*0.55, y - s*1.70, x - s*0.60, y - s*1.20, x - s*0.52, y - s*0.80);
+      ctx.stroke();
+      // right strand
+      ctx.beginPath();
+      ctx.moveTo(x + s*0.28, y - s*2.10);
+      ctx.bezierCurveTo(x + s*0.55, y - s*1.70, x + s*0.60, y - s*1.20, x + s*0.52, y - s*0.80);
+      ctx.stroke();
+      // top of hair (cap over head)
+      ctx.beginPath();
+      ctx.arc(x, y - s*2.15, s*0.33, Math.PI, 0);
+      ctx.stroke();
+      ctx.restore();
+      // arms toward center (leftward)
+      ctx.beginPath(); ctx.moveTo(x,y-s*1.12); ctx.lineTo(x-s*0.55,y-s*0.55); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,y-s*1.12); ctx.lineTo(x-s*0.36,y-s*1.48); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(x,y-s*0.50); ctx.lineTo(x-s*0.24,y+s*0.52); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,y-s*0.50); ctx.lineTo(x+s*0.24,y+s*0.52); ctx.stroke();
+      // arms toward center (rightward)
+      ctx.beginPath(); ctx.moveTo(x,y-s*1.12); ctx.lineTo(x+s*0.55,y-s*0.55); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,y-s*1.12); ctx.lineTo(x+s*0.36,y-s*1.48); ctx.stroke();
+    }
+    if (shooting) {
+      const mx = female ? x-s*0.04 : x+s*0.04;
+      ctx.beginPath(); ctx.arc(mx, y-s*1.70, s*0.09, 0, Math.PI*2);
+      ctx.fillStyle='#e63030'; ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function ease(t) { return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+  function frame() {
+    ctx.clearRect(0, 0, W, H);
+    frameN++;
+
+    const shooting = nextTarget < N && Math.floor(frameN/13)%2===0;
+    figure(manX, manY, sc, false, shooting);
+    figure(womanX, womanY, sc, true, shooting);
+
+    // Spawn with pre-assigned fixed targets
+    if (nextTarget < N) {
+      spawnTimer++;
+      if (spawnTimer >= SPAWN_EVERY) {
+        spawnTimer = 0;
+        if (nextTarget < N) {
+          const t = targets[nextTarget];
+          flying.push({ x0: manX+sc*0.18, y0: manY-sc*1.70, tx: t.x, ty: t.y, slotIdx: nextTarget, p: 0 });
+          nextTarget++;
+        }
+        if (nextTarget < N) {
+          const t = targets[nextTarget];
+          flying.push({ x0: womanX-sc*0.18, y0: womanY-sc*1.70, tx: t.x, ty: t.y, slotIdx: nextTarget, p: 0 });
+          nextTarget++;
+        }
+      }
+    }
+
+    // Fly
+    const hs = Math.min(W,H) * 0.013;
+    for (let i = flying.length-1; i >= 0; i--) {
+      const f = flying[i];
+      f.p = Math.min(1, f.p + 0.017);
+      const e = ease(f.p);
+      const px = f.x0 + (f.tx - f.x0) * e;
+      const py = f.y0 + (f.ty - f.y0) * e - Math.sin(f.p * Math.PI) * H * 0.10;
+      miniHeart(px, py, hs, 0.9);
+      if (f.p >= 1) { landed[f.slotIdx] = { alpha: 0.05 }; flying.splice(i,1); }
+    }
+
+    // Draw landed hearts on outline — no fill, outline only
+    landed.forEach((slot, i) => {
+      if (!slot) return;
+      slot.alpha = Math.min(1, slot.alpha + 0.04);
+      const pulse = 1 + Math.sin(frameN*0.05 + i*0.18) * 0.09;
+      const col = '#e63030';
+      miniHeart(targets[i].x, targets[i].y, hs * pulse, slot.alpha, col);
+    });
+
+    finalAnimId = requestAnimationFrame(frame);
+  }
+
+  frame();
+}
+
+function stopFinalAnimation() {
+  if (finalAnimId) { cancelAnimationFrame(finalAnimId); finalAnimId = null; }
+}
+
+
+/* ─── SLIDES ─── */
+const slides = [
+  { type:'number', value:'9½',        unit:'mesi',      label:'sono passati' },
+  { type:'number', value:'42',         unit:'settimane', label:'' },
+  { type:'number', value:'291',        unit:'giorni',    label:'' },
+  { type:'number', value:'6.985',      unit:'ore',       label:'' },
+  { type:'number', value:'419.100',    unit:'minuti',    label:'' },
+  { type:'number', value:'25.146.000', unit:'secondi',   label:'' },
+  { type:'text', text:'e non ho mai smesso di amarti…' },
+  { type:'text', text:'…neanche un istante…' },
+  { type:'text', text:'…in questi giorni ho riflettuto molto…' },
+  { type:'text', text:'…su me stesso e su quale fosse stato il problema tra noi…' },
+  { type:'text', text:'…e penso che cambiando certe cose possiamo farcela…' },
+  { type:'text', text:'…come se al mondo ci fossimo solo noi ❤️‍🩹' },
+  { type:'final', text:'ci riproviamo?' },
+];
+
+const stage  = document.getElementById('stage');
+const dotsEl = document.getElementById('dots');
+slides.forEach(()=>{ const d=document.createElement('div'); d.className='dot'; dotsEl.appendChild(d); });
+const dotNodes=dotsEl.querySelectorAll('.dot');
+
+function buildCard(s){
+  const el=document.createElement('div');
+  if(s.type==='number'){
+    el.className='card number';
+    el.innerHTML=`${s.label?`<div class="label">${s.label}</div>`:''}<div class="value">${s.value}</div><div class="unit">${s.unit}</div>`;
+  } else if(s.type==='text'){
+    el.className='card text';
+    el.innerHTML=`<div class="line">${s.text}</div>`;
+  } else {
+    el.className='card final';
+    el.innerHTML=`<div id="finalScene"><canvas id="finalCanvas"></canvas><div id="finalText">${s.text}</div></div>`;
+  }
+  return el;
+}
+
+let current=0, currentEl=null, ready=false;
+
+function show(idx){
+  ready=false; stopFinalAnimation();
+  const newEl=buildCard(slides[idx]);
+  stage.appendChild(newEl);
+  dotNodes.forEach((d,i)=>d.classList.toggle('active',i===idx));
+  if(currentEl){ const old=currentEl; old.classList.add('exit'); setTimeout(()=>old.remove(),700); }
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    newEl.classList.add('visible');
+    if(slides[idx].type==='final'){
+      setTimeout(()=>{ startFinalAnimation(); },400);
+    }
+    setTimeout(()=>{ ready=true; },1000);
+  }));
+  currentEl=newEl;
+}
+
+function next(){ if(!ready)return; if(current<slides.length-1){current++;show(current);} }
+document.addEventListener('click', next);
+document.addEventListener('touchend', e=>{
+  e.preventDefault();
+  // ripple effect at touch point
+  const touch = e.changedTouches[0];
+  const r = document.createElement('div');
+  r.className = 'ripple';
+  const size = 80;
+  r.style.cssText = `width:${size}px;height:${size}px;left:${touch.clientX - size/2}px;top:${touch.clientY - size/2}px`;
+  document.body.appendChild(r);
+  setTimeout(() => r.remove(), 700);
+  next();
+});
+document.addEventListener('keydown', e=>{ if(e.key==='ArrowRight'||e.key===' '||e.key==='Enter')next(); });
+// Prevent iOS bounce scroll
+document.body.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+show(0);
+</script>
+</body>
+</html>
